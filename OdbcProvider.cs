@@ -5,14 +5,12 @@ using System.Configuration;
 using System.Configuration.Provider;
 using System.Data.Odbc;
 using System.Diagnostics;
-using System.Linq;
 using System.Web.Security;
 
 namespace OdbcProvider
 {
     public class OdbcMembershipProvider : MembershipProvider
     {
-        private Dictionary<string, MembershipUser> _Users;
         private string _connectionStringName;
         private string _connectionString;
         private Utils _Utils;
