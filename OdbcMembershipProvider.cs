@@ -411,9 +411,30 @@ namespace OdbcProvider
 
         public override bool DeleteUser(string username, bool deleteAllRelatedData)
         {
-            System.Diagnostics.Debug.WriteLine("DeleteUser()");
-            throw new NotSupportedException();
+            if (string.IsNullOrEmpty(username))
+                throw new ArgumentException("Username cannot be null or empty.");
+
+            try
+            {
+                string deleteQuery = "DELETE FROM `users` WHERE username = ?";
+                using (OdbcConnection connection = new OdbcConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (OdbcCommand command = new OdbcCommand(deleteQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("username", username);
+                        int rowsAffected = command.ExecuteNonQuery();
+                        return rowsAffected > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"DeleteUser() Exception: {ex.Message}");
+                throw new ProviderException("An error occurred while deleting the user.");
+            }
         }
+
 
         /* ---------------------------------------- */
 

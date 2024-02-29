@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Configuration.Provider;
 using System.Data.Odbc;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace OdbcProvider
 {
