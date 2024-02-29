@@ -60,9 +60,9 @@ namespace OdbcProvider
                     connection.Open();
                     foreach (SettingsProperty prop in collection)
                     {
-                        using (OdbcCommand command = new OdbcCommand("SELECT propertyvalue FROM profiles WHERE username = ? AND propertyname = ?", connection))
+                        using (OdbcCommand command = new OdbcCommand("SELECT propertyvalue FROM profiles WHERE user_name = ? AND propertyname = ?", connection))
                         {
-                            command.Parameters.AddWithValue("username", username);
+                            command.Parameters.AddWithValue("user_name", username);
                             command.Parameters.AddWithValue("propertyname", prop.Name);
 
                             object value = command.ExecuteScalar();
@@ -102,9 +102,9 @@ namespace OdbcProvider
                     connection.Open();
                     foreach (SettingsPropertyValue propValue in collection)
                     {
-                        using (OdbcCommand command = new OdbcCommand("MERGE INTO profiles USING (VALUES(?, ?, ?)) AS NewValues (username, propertyname, propertyvalue) ON profiles.username = NewValues.username AND profiles.propertyname = NewValues.propertyname WHEN MATCHED THEN UPDATE SET propertyvalue = NewValues.propertyvalue WHEN NOT MATCHED THEN INSERT (username, propertyname, propertyvalue) VALUES (NewValues.username, NewValues.propertyname, NewValues.propertyvalue);", connection))
+                        using (OdbcCommand command = new OdbcCommand("MERGE INTO profiles USING (VALUES(?, ?, ?)) AS NewValues (user_name, propertyname, propertyvalue) ON profiles.user_name = NewValues.user_name AND profiles.propertyname = NewValues.propertyname WHEN MATCHED THEN UPDATE SET propertyvalue = NewValues.propertyvalue WHEN NOT MATCHED THEN INSERT (user_name, propertyname, propertyvalue) VALUES (NewValues.user_name, NewValues.propertyname, NewValues.propertyvalue);", connection))
                         {
-                            command.Parameters.AddWithValue("username", username);
+                            command.Parameters.AddWithValue("user_name", username);
                             command.Parameters.AddWithValue("propertyname", propValue.Name);
                             command.Parameters.AddWithValue("propertyvalue", propValue.PropertyValue ?? DBNull.Value);
                             command.ExecuteNonQuery();
@@ -128,7 +128,7 @@ namespace OdbcProvider
             try
             {
                 string query = "SELECT COUNT(*) FROM profiles";
-                string selectQuery = "SELECT username, lastactivitydate FROM profiles ORDER BY username OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                string selectQuery = "SELECT user_name, lastactivitydate FROM profiles ORDER BY user_name OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
 
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
@@ -150,7 +150,7 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string username = reader["username"].ToString();
+                                string username = reader["user_name"].ToString();
                                 DateTime lastActivityDate = DateTime.Parse(reader["lastactivitydate"].ToString());
 
                                 ProfileInfo profile = new ProfileInfo(username, false, lastActivityDate, lastActivityDate, 0);
@@ -178,7 +178,7 @@ namespace OdbcProvider
             try
             {
                 string query = "SELECT COUNT(*) FROM profiles WHERE lastactivitydate <= ?";
-                string selectQuery = "SELECT username, lastactivitydate FROM profiles WHERE lastactivitydate <= ? ORDER BY username OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                string selectQuery = "SELECT user_name, lastactivitydate FROM profiles WHERE lastactivitydate <= ? ORDER BY user_name OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
 
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
@@ -202,7 +202,7 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string username = reader["username"].ToString();
+                                string username = reader["user_name"].ToString();
                                 DateTime lastActivityDate = DateTime.Parse(reader["lastactivitydate"].ToString());
 
                                 ProfileInfo profile = new ProfileInfo(username, false, lastActivityDate, lastActivityDate, 0);
@@ -257,8 +257,8 @@ namespace OdbcProvider
 
             try
             {
-                string query = "SELECT COUNT(*) FROM profiles WHERE lastactivitydate <= ? AND username LIKE ?";
-                string selectQuery = "SELECT username, lastactivitydate FROM profiles WHERE lastactivitydate <= ? AND username LIKE ? ORDER BY username OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                string query = "SELECT COUNT(*) FROM profiles WHERE lastactivitydate <= ? AND user_name LIKE ?";
+                string selectQuery = "SELECT user_name, lastactivitydate FROM profiles WHERE lastactivitydate <= ? AND user_name LIKE ? ORDER BY user_name OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
 
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
@@ -268,7 +268,7 @@ namespace OdbcProvider
                     using (OdbcCommand countCommand = new OdbcCommand(query, connection))
                     {
                         countCommand.Parameters.AddWithValue("lastactivitydate", userInactiveSinceDate);
-                        countCommand.Parameters.AddWithValue("username", $"%{usernameToMatch}%");
+                        countCommand.Parameters.AddWithValue("user_name", $"%{usernameToMatch}%");
                         totalRecords = Convert.ToInt32(countCommand.ExecuteScalar());
                     }
 
@@ -276,7 +276,7 @@ namespace OdbcProvider
                     using (OdbcCommand selectCommand = new OdbcCommand(selectQuery, connection))
                     {
                         selectCommand.Parameters.AddWithValue("lastactivitydate", userInactiveSinceDate);
-                        selectCommand.Parameters.AddWithValue("username", $"%{usernameToMatch}%");
+                        selectCommand.Parameters.AddWithValue("user_name", $"%{usernameToMatch}%");
                         selectCommand.Parameters.AddWithValue("offset", pageIndex * pageSize);
                         selectCommand.Parameters.AddWithValue("fetchNext", pageSize);
 
@@ -284,7 +284,7 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string username = reader["username"].ToString();
+                                string username = reader["user_name"].ToString();
                                 DateTime lastActivityDate = DateTime.Parse(reader["lastactivitydate"].ToString());
 
                                 ProfileInfo profile = new ProfileInfo(username, false, lastActivityDate, lastActivityDate, 0);
@@ -310,8 +310,8 @@ namespace OdbcProvider
 
             try
             {
-                string query = "SELECT COUNT(*) FROM profiles WHERE username LIKE ?";
-                string selectQuery = "SELECT username, lastactivitydate FROM profiles WHERE username LIKE ? ORDER BY username OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                string query = "SELECT COUNT(*) FROM profiles WHERE user_name LIKE ?";
+                string selectQuery = "SELECT user_name, lastactivitydate FROM profiles WHERE user_name LIKE ? ORDER BY user_name OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
 
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
@@ -320,14 +320,14 @@ namespace OdbcProvider
                     // Get total number of profiles matching the username pattern
                     using (OdbcCommand countCommand = new OdbcCommand(query, connection))
                     {
-                        countCommand.Parameters.AddWithValue("username", $"%{usernameToMatch}%");
+                        countCommand.Parameters.AddWithValue("user_name", $"%{usernameToMatch}%");
                         totalRecords = Convert.ToInt32(countCommand.ExecuteScalar());
                     }
 
                     // Retrieve profiles matching the username pattern with pagination
                     using (OdbcCommand selectCommand = new OdbcCommand(selectQuery, connection))
                     {
-                        selectCommand.Parameters.AddWithValue("username", $"%{usernameToMatch}%");
+                        selectCommand.Parameters.AddWithValue("user_name", $"%{usernameToMatch}%");
                         selectCommand.Parameters.AddWithValue("offset", pageIndex * pageSize);
                         selectCommand.Parameters.AddWithValue("fetchNext", pageSize);
 
@@ -335,7 +335,7 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string username = reader["username"].ToString();
+                                string username = reader["user_name"].ToString();
                                 DateTime lastActivityDate = DateTime.Parse(reader["lastactivitydate"].ToString());
 
                                 ProfileInfo profile = new ProfileInfo(username, false, lastActivityDate, lastActivityDate, 0);
@@ -360,7 +360,7 @@ namespace OdbcProvider
 
             try
             {
-                string deleteQuery = "DELETE FROM profiles WHERE username = ?";
+                string deleteQuery = "DELETE FROM profiles WHERE user_name = ?";
 
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
@@ -370,7 +370,7 @@ namespace OdbcProvider
                     {
                         using (OdbcCommand deleteCommand = new OdbcCommand(deleteQuery, connection))
                         {
-                            deleteCommand.Parameters.AddWithValue("username", profile.UserName);
+                            deleteCommand.Parameters.AddWithValue("user_name", profile.UserName);
                             deletedCount += deleteCommand.ExecuteNonQuery();
                         }
                     }
@@ -392,7 +392,7 @@ namespace OdbcProvider
 
             try
             {
-                string deleteQuery = "DELETE FROM profiles WHERE username = ?";
+                string deleteQuery = "DELETE FROM profiles WHERE user_name = ?";
 
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
@@ -402,7 +402,7 @@ namespace OdbcProvider
                     {
                         using (OdbcCommand deleteCommand = new OdbcCommand(deleteQuery, connection))
                         {
-                            deleteCommand.Parameters.AddWithValue("username", username);
+                            deleteCommand.Parameters.AddWithValue("user_name", username);
                             deletedCount += deleteCommand.ExecuteNonQuery();
                         }
                     }

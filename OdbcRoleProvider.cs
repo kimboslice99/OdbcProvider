@@ -67,11 +67,11 @@ namespace OdbcProvider
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
-                    string query = "SELECT COUNT(*) FROM user_group ug JOIN `groups` g ON ug.group_id = g.group_id JOIN `users` u ON ug.user_id = u.user_id WHERE u.username = ? AND g.group_name = ?";
+                    string query = "SELECT COUNT(*) FROM user_roles ug JOIN roles g ON ug.group_id = g.group_id JOIN users u ON ug.user_id = u.user_id WHERE u.user_name = ? AND g.role_name = ?";
                     using (OdbcCommand command = new OdbcCommand(query, connection))
                     {
-                        command.Parameters.AddWithValue("username", username);
-                        command.Parameters.AddWithValue("roleName", roleName);
+                        command.Parameters.AddWithValue("user_name", username);
+                        command.Parameters.AddWithValue("role_name", roleName);
                         int count = Convert.ToInt32(command.ExecuteScalar());
                         userInRole = count > 0;
                     }
@@ -98,16 +98,16 @@ namespace OdbcProvider
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
-                    string query = "SELECT g.group_name FROM user_group ug JOIN `groups` g ON ug.group_id = g.group_id JOIN `users` u ON ug.user_id = u.user_id WHERE u.username = ?";
+                    string query = "SELECT g.role_name FROM user_roles ug JOIN roles g ON ug.role_id = g.role_id JOIN users u ON ug.user_id = u.user_id WHERE u.user_name = ?";
                     using (OdbcCommand command = new OdbcCommand(query, connection))
                     {
-                        command.Parameters.AddWithValue("username", username);
+                        command.Parameters.AddWithValue("user_name", username);
                         using (OdbcDataReader reader = command.ExecuteReader())
                         {
                             var roleList = new List<string>();
                             while (reader.Read())
                             {
-                                roleList.Add(reader["group_name"].ToString());
+                                roleList.Add(reader["role_name"].ToString());
                             }
                             roles = roleList.ToArray();
                         }
@@ -135,15 +135,15 @@ namespace OdbcProvider
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
-                    string query = "SELECT u.username FROM user_group ug JOIN `groups` g ON ug.group_id = g.group_id JOIN `users` u ON ug.user_id = u.user_id WHERE g.group_name = ?";
+                    string query = "SELECT u.user_name FROM user_roles ug JOIN roles g ON ug.role_id = g.role_id JOIN users u ON ug.user_id = u.user_id WHERE g.role_name = ?";
                     using (OdbcCommand command = new OdbcCommand(query, connection))
                     {
-                        command.Parameters.AddWithValue("roleName", roleName);
+                        command.Parameters.AddWithValue("role_name", roleName);
                         using (OdbcDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                string username = reader["username"].ToString();
+                                string username = reader["user_name"].ToString();
                                 usersInRole.Add(username);
                             }
                         }
@@ -170,14 +170,14 @@ namespace OdbcProvider
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
-                    string query = "SELECT group_name FROM `groups`";
+                    string query = "SELECT role_name FROM roles";
                     using (OdbcCommand command = new OdbcCommand(query, connection))
                     {
                         using (OdbcDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                string roleName = reader["group_name"].ToString();
+                                string roleName = reader["role_name"].ToString();
                                 allRoles.Add(roleName);
                             }
                         }
@@ -204,7 +204,7 @@ namespace OdbcProvider
                 throw new ArgumentException();
             try
             {
-                string userQueryString = $"SELECT * FROM `groups` WHERE `group_name`={roleName}";
+                string userQueryString = $"SELECT * FROM roles WHERE role_name={roleName}";
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
@@ -229,7 +229,7 @@ namespace OdbcProvider
         {
             try
             {
-                string userQueryString = $"INSERT INTO `groups` (`group_name`) VALUES ('{roleName}')";
+                string userQueryString = $"INSERT INTO roles (role_name) VALUES ('{roleName}')";
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
@@ -249,7 +249,7 @@ namespace OdbcProvider
         {
             try
             {
-                string userQueryString = $"DELETE FROM `groups` WHERE `group_name`={roleName}";
+                string userQueryString = $"DELETE FROM roles WHERE role_name={roleName}";
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
@@ -284,15 +284,15 @@ namespace OdbcProvider
                     {
                         foreach (string roleName in roleNames)
                         {
-                            string userIdQuery = "SELECT user_id FROM `users` WHERE username = ?";
-                            string roleIdQuery = "SELECT group_id FROM `groups` WHERE group_name = ?";
-                            string addUserRoleQuery = "INSERT INTO user_group (user_id, group_id) VALUES (?, ?)";
+                            string userIdQuery = "SELECT user_id FROM users WHERE user_name = ?";
+                            string roleIdQuery = "SELECT role_id FROM roles WHERE role_name = ?";
+                            string addUserRoleQuery = "INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)";
 
                             // Get user ID
                             int userId;
                             using (OdbcCommand userIdCommand = new OdbcCommand(userIdQuery, connection))
                             {
-                                userIdCommand.Parameters.AddWithValue("username", username);
+                                userIdCommand.Parameters.AddWithValue("user_name", username);
                                 userId = Convert.ToInt32(userIdCommand.ExecuteScalar());
                             }
 
@@ -300,15 +300,15 @@ namespace OdbcProvider
                             int roleId;
                             using (OdbcCommand roleIdCommand = new OdbcCommand(roleIdQuery, connection))
                             {
-                                roleIdCommand.Parameters.AddWithValue("roleName", roleName);
+                                roleIdCommand.Parameters.AddWithValue("role_name", roleName);
                                 roleId = Convert.ToInt32(roleIdCommand.ExecuteScalar());
                             }
 
                             // Add user to role
                             using (OdbcCommand addUserRoleCommand = new OdbcCommand(addUserRoleQuery, connection))
                             {
-                                addUserRoleCommand.Parameters.AddWithValue("userId", userId);
-                                addUserRoleCommand.Parameters.AddWithValue("roleId", roleId);
+                                addUserRoleCommand.Parameters.AddWithValue("user_id", userId);
+                                addUserRoleCommand.Parameters.AddWithValue("role_id", roleId);
                                 addUserRoleCommand.ExecuteNonQuery();
                             }
                         }
@@ -338,17 +338,17 @@ namespace OdbcProvider
                 {
                     connection.Open();
 
-                    string query = "SELECT u.username FROM `users` u INNER JOIN user_group ug ON u.user_id = ug.user_id INNER JOIN `groups` g ON ug.group_id = g.group_id WHERE g.group_name = ? AND u.username LIKE ?";
+                    string query = "SELECT u.user_name FROM users u INNER JOIN user_roles ug ON u.user_id = ug.user_id INNER JOIN roles g ON ug.role_id = g.role_id WHERE g.role_name = ? AND u.user_name LIKE ?";
                     using (OdbcCommand command = new OdbcCommand(query, connection))
                     {
-                        command.Parameters.AddWithValue("roleName", roleName);
+                        command.Parameters.AddWithValue("role_name", roleName);
                         command.Parameters.AddWithValue("usernameToMatch", $"%{usernameToMatch}%");
 
                         using (OdbcDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                string username = reader["username"].ToString();
+                                string username = reader["user_name"].ToString();
                                 matchedUsernames.Add(username);
                             }
                         }
@@ -382,15 +382,15 @@ namespace OdbcProvider
                     {
                         foreach (string roleName in roleNames)
                         {
-                            string userIdQuery = "SELECT user_id FROM `users` WHERE username = ?";
-                            string roleIdQuery = "SELECT group_id FROM `groups` WHERE group_name = ?";
-                            string deleteUserRoleQuery = "DELETE FROM user_group WHERE user_id = ? AND group_id = ?";
+                            string userIdQuery = "SELECT user_id FROM users WHERE user_name = ?";
+                            string roleIdQuery = "SELECT role_id FROM roles WHERE role_name = ?";
+                            string deleteUserRoleQuery = "DELETE FROM user_roles WHERE user_id = ? AND role_id = ?";
 
                             // Get user ID
                             int userId;
                             using (OdbcCommand userIdCommand = new OdbcCommand(userIdQuery, connection))
                             {
-                                userIdCommand.Parameters.AddWithValue("username", username);
+                                userIdCommand.Parameters.AddWithValue("user_name", username);
                                 userId = Convert.ToInt32(userIdCommand.ExecuteScalar());
                             }
 
@@ -398,15 +398,15 @@ namespace OdbcProvider
                             int roleId;
                             using (OdbcCommand roleIdCommand = new OdbcCommand(roleIdQuery, connection))
                             {
-                                roleIdCommand.Parameters.AddWithValue("roleName", roleName);
+                                roleIdCommand.Parameters.AddWithValue("role_name", roleName);
                                 roleId = Convert.ToInt32(roleIdCommand.ExecuteScalar());
                             }
 
                             // Remove user from role
                             using (OdbcCommand deleteUserRoleCommand = new OdbcCommand(deleteUserRoleQuery, connection))
                             {
-                                deleteUserRoleCommand.Parameters.AddWithValue("userId", userId);
-                                deleteUserRoleCommand.Parameters.AddWithValue("roleId", roleId);
+                                deleteUserRoleCommand.Parameters.AddWithValue("user_id", userId);
+                                deleteUserRoleCommand.Parameters.AddWithValue("role_id", roleId);
                                 deleteUserRoleCommand.ExecuteNonQuery();
                             }
                         }

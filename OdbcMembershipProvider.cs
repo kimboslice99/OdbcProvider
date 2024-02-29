@@ -132,11 +132,11 @@ namespace OdbcProvider
             try
             {
                 // Query the database to validate user credentials
-                string query = "SELECT user_password FROM `users` WHERE username = ?";
+                string query = "SELECT user_password FROM users WHERE user_name = ?";
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 using (OdbcCommand command = new OdbcCommand(query, connection))
                 {
-                    command.Parameters.AddWithValue("username", username);
+                    command.Parameters.AddWithValue("user_name", username);
                     connection.Open();
                     object result = command.ExecuteScalar();
                     if (result != null)
@@ -163,18 +163,18 @@ namespace OdbcProvider
 
             try
             {
-                string query = "SELECT * FROM `users` WHERE username = ?";
+                string query = "SELECT * FROM users WHERE user_name = ?";
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
                     using (OdbcCommand command = new OdbcCommand(query, connection))
                     {
-                        command.Parameters.AddWithValue("username", username);
+                        command.Parameters.AddWithValue("user_name", username);
                         using (OdbcDataReader reader = command.ExecuteReader())
                         {
                             if (reader.Read())
                             {
-                                string sUserName = reader["username"].ToString();
+                                string sUserName = reader["user_name"].ToString();
                                 string sEmail = reader["user_email"].ToString();
                                 string sPassword = reader["user_password"].ToString();
                                 DateTime dCreationDate = _Utils.ConvertDate(reader["user_regdate"].ToString());
@@ -234,8 +234,8 @@ namespace OdbcProvider
 
             try
             {
-                string query = "SELECT COUNT(*) FROM `users`";
-                string selectQuery = "SELECT * FROM `users` ORDER BY username OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                string query = "SELECT COUNT(*) FROM users";
+                string selectQuery = "SELECT * FROM users ORDER BY user_name OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
 
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
@@ -257,7 +257,7 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string sUserName = reader["username"].ToString();
+                                string sUserName = reader["user_name"].ToString();
                                 string sEmail = reader["user_email"].ToString();
                                 string sPassword = reader["user_password"].ToString();
                                 DateTime dCreationDate = _Utils.ConvertDate(reader["user_regdate"].ToString());
@@ -362,7 +362,7 @@ namespace OdbcProvider
                     string hashedPassword = _Utils.PasswordHash(password);
 
                     // Construct the SQL query to insert the new user into the phpBB_users table
-                    string insertUserQuery = $"INSERT INTO users (username, user_password, user_email, user_regdate, user_session_time, user_active) " +
+                    string insertUserQuery = $"INSERT INTO users (user_name, user_password, user_email, user_regdate, user_session_time, user_active) " +
                                              $"VALUES ('{username}', '{hashedPassword}', '{email}', {registrationDate}, {registrationDate}, {Convert.ToInt32(isApproved)})";
 
                     // Execute the insert query
@@ -416,13 +416,13 @@ namespace OdbcProvider
 
             try
             {
-                string deleteQuery = "DELETE FROM `users` WHERE username = ?";
+                string deleteQuery = "DELETE FROM users WHERE user_name = ?";
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
                     using (OdbcCommand command = new OdbcCommand(deleteQuery, connection))
                     {
-                        command.Parameters.AddWithValue("username", username);
+                        command.Parameters.AddWithValue("user_name", username);
                         int rowsAffected = command.ExecuteNonQuery();
                         return rowsAffected > 0;
                     }
@@ -508,7 +508,7 @@ namespace OdbcProvider
             try
             {
                 // Construct the SQL query to update the user information in the database
-                string updateUserQuery = "UPDATE users SET user_email = ?, user_active = ? WHERE username = ?";
+                string updateUserQuery = "UPDATE users SET user_email = ?, user_active = ? WHERE user_name = ?";
 
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
@@ -519,7 +519,7 @@ namespace OdbcProvider
                     {
                         command.Parameters.AddWithValue("user_email", user.Email);
                         command.Parameters.AddWithValue("user_active", user.IsApproved ? 1 : 0);
-                        command.Parameters.AddWithValue("username", user.UserName);
+                        command.Parameters.AddWithValue("user_name", user.UserName);
                         command.ExecuteNonQuery();
                     }
                 }
