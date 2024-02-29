@@ -119,5 +119,17 @@ namespace OdbcProvider
             }
             return dateTime;
         }
+
+        internal int GetUserId(string username, string connectionString)
+        {
+            string userQueryString = $"SELECT `user_id` FROM `users` WHERE `username`={username}";
+            using (OdbcConnection connection = new OdbcConnection(connectionString))
+            {
+                connection.Open();
+                OdbcCommand userCommand = new OdbcCommand(userQueryString, connection);
+                return Convert.ToInt32(userCommand.ExecuteScalar());
+
+            }
+        }
     }
 }

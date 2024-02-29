@@ -1,15 +1,10 @@
-﻿/* ======================================== */
-//
-// Thanks to Robert McMurray for a good example to start from :)
-//
-/* ======================================== */
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Configuration;
 using System.Configuration.Provider;
 using System.Data.Odbc;
+using System.Diagnostics;
 using System.Linq;
 using System.Web.Security;
 
@@ -133,85 +128,195 @@ namespace OdbcProvider
 
         public override bool ValidateUser(string username, string password)
         {
-            if (String.IsNullOrEmpty(username) || String.IsNullOrEmpty(password))
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
                 return false;
 
             try
             {
-                // Retrieve user data from the membership data store
-                ReadMembershipDataStore();
-
-                MembershipUser user;
-                if (_Users.TryGetValue(username, out user))
+                // Query the database to validate user credentials
+                string query = "SELECT user_password FROM `users` WHERE username = ?";
+                using (OdbcConnection connection = new OdbcConnection(_connectionString))
+                using (OdbcCommand command = new OdbcCommand(query, connection))
                 {
-                    if (_Utils.PasswordVerify(password, user.Comment))
+                    command.Parameters.AddWithValue("username", username);
+                    connection.Open();
+                    object result = command.ExecuteScalar();
+                    if (result != null)
                     {
-                        // Check if user is not locked out and is approved
-                        if (!user.IsLockedOut && user.IsApproved)
+                        string hashedPassword = result.ToString();
+                        return _Utils.PasswordVerify(password, hashedPassword);
+                    }
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Error validating user: " + ex.Message);
+                return false;
+            }
+        }
+
+        /* ---------------------------------------- */
+
+        public override MembershipUser GetUser(string username, bool userIsOnline)
+        {
+            if (string.IsNullOrEmpty(username))
+                return null;
+
+            try
+            {
+                string query = "SELECT * FROM `users` WHERE username = ?";
+                using (OdbcConnection connection = new OdbcConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (OdbcCommand command = new OdbcCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("username", username);
+                        using (OdbcDataReader reader = command.ExecuteReader())
                         {
-                            return true; // User is authenticated
+                            if (reader.Read())
+                            {
+                                string sUserName = reader["username"].ToString();
+                                string sEmail = reader["user_email"].ToString();
+                                string sPassword = reader["user_password"].ToString();
+                                DateTime dCreationDate = _Utils.ConvertDate(reader["user_regdate"].ToString());
+                                DateTime dLastLoginDate = _Utils.ConvertDate(reader["user_session_time"].ToString());
+
+                                if (dLastLoginDate == new DateTime(1970, 1, 1))
+                                {
+                                    dLastLoginDate = dCreationDate;
+                                }
+
+                                DateTime dLastActivityDate = _Utils.ConvertDate(reader["user_session_time"].ToString());
+                                if (dLastActivityDate == new DateTime(1970, 1, 1))
+                                {
+                                    dLastActivityDate = dLastLoginDate;
+                                }
+
+                                Int32 status = Convert.ToInt32(reader["user_active"]?.ToString() ?? "0");
+                                bool approved = (status == 0) ? false : true;
+                                bool locked = (status == 0) ? true : false;
+
+                                return new MembershipUser(
+                                    Name,              // Provider name
+                                    sUserName,         // UserName
+                                    null,              // ProviderUserKey
+                                    sEmail,            // Email
+                                    string.Empty,      // PasswordQuestion
+                                    sPassword,         // Comment
+                                    approved,          // IsApproved
+                                    locked,            // IsLockedOut
+                                    dCreationDate,     // CreationDate
+                                    dLastLoginDate,    // LastLoginDate
+                                    dLastActivityDate, // LastActivityDate
+                                    dCreationDate,     // LastPasswordChangedDate
+                                    dCreationDate      // LastLockoutDate
+                                );
+                            }
                         }
                     }
                 }
-                return false; // User is not authenticated
             }
             catch (Exception ex)
             {
-                // Log or handle the exception appropriately
-                System.Diagnostics.Debug.WriteLine("Error validating user: " + ex.Message);
-                return false;
+                Debug.WriteLine($"GetUser() Exception: {ex.Message}");
+                throw new ProviderException("An error occurred while retrieving the user.");
             }
-        }
 
-        /* ---------------------------------------- */
-
-        public override MembershipUser GetUser(
-          string username, bool userIsOnline)
-        {
-            if (String.IsNullOrEmpty(username)) return null;
-            ReadMembershipDataStore();
-            try
-            {
-                MembershipUser user;
-                if (_Users.TryGetValue(username, out user)) return user;
-            }
-            catch (Exception ex)
-            {
-                throw new ProviderException("Error: " + ex.Message);
-            }
             return null;
         }
 
+
         /* ---------------------------------------- */
 
-        public override MembershipUserCollection GetAllUsers(
-          int pageIndex, int pageSize, out int totalRecords)
+        public override MembershipUserCollection GetAllUsers(int pageIndex, int pageSize, out int totalRecords)
         {
-            ReadMembershipDataStore();
             MembershipUserCollection users = new MembershipUserCollection();
-            if ((pageIndex >= 0) && (pageSize >= 1))
+            totalRecords = 0;
+
+            try
             {
-                try
+                string query = "SELECT COUNT(*) FROM `users`";
+                string selectQuery = "SELECT * FROM `users` ORDER BY username OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+
+                using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
-                    foreach (KeyValuePair<string, MembershipUser> pair
-                      in _Users.Skip(pageIndex * pageSize).Take(pageSize))
+                    connection.Open();
+
+                    // Get total number of users
+                    using (OdbcCommand countCommand = new OdbcCommand(query, connection))
                     {
-                        users.Add(pair.Value);
+                        totalRecords = Convert.ToInt32(countCommand.ExecuteScalar());
+                    }
+
+                    // Retrieve users with pagination
+                    using (OdbcCommand selectCommand = new OdbcCommand(selectQuery, connection))
+                    {
+                        selectCommand.Parameters.AddWithValue("offset", pageIndex * pageSize);
+                        selectCommand.Parameters.AddWithValue("fetchNext", pageSize);
+
+                        using (OdbcDataReader reader = selectCommand.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                string sUserName = reader["username"].ToString();
+                                string sEmail = reader["user_email"].ToString();
+                                string sPassword = reader["user_password"].ToString();
+                                DateTime dCreationDate = _Utils.ConvertDate(reader["user_regdate"].ToString());
+                                DateTime dLastLoginDate = _Utils.ConvertDate(reader["user_session_time"].ToString());
+
+                                if (dLastLoginDate == new DateTime(1970, 1, 1))
+                                {
+                                    dLastLoginDate = dCreationDate;
+                                }
+
+                                DateTime dLastActivityDate = _Utils.ConvertDate(reader["user_session_time"].ToString());
+                                if (dLastActivityDate == new DateTime(1970, 1, 1))
+                                {
+                                    dLastActivityDate = dLastLoginDate;
+                                }
+
+                                Int32 status = Convert.ToInt32(reader["user_active"]?.ToString() ?? "0");
+                                bool approved = (status == 0) ? false : true;
+                                bool locked = (status == 0) ? true : false;
+
+                                MembershipUser user = new MembershipUser(
+                                    Name,              // Provider name
+                                    sUserName,         // UserName
+                                    null,              // ProviderUserKey
+                                    sEmail,            // Email
+                                    string.Empty,      // PasswordQuestion
+                                    sPassword,         // Comment
+                                    approved,          // IsApproved
+                                    locked,            // IsLockedOut
+                                    dCreationDate,     // CreationDate
+                                    dLastLoginDate,    // LastLoginDate
+                                    dLastActivityDate, // LastActivityDate
+                                    dCreationDate,     // LastPasswordChangedDate
+                                    dCreationDate      // LastLockoutDate
+                                );
+
+                                users.Add(user);
+                            }
+                        }
                     }
                 }
-                catch (Exception ex)
-                {
-                    throw new ProviderException("Error: " + ex.Message);
-                }
             }
-            totalRecords = _Users.Count;
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"GetAllUsers() Exception: {ex.Message}");
+                throw new ProviderException("An error occurred while retrieving all users.");
+            }
+
             return users;
         }
+
 
         /* ---------------------------------------- */
 
         public override int GetNumberOfUsersOnline()
         {
+            System.Diagnostics.Debug.WriteLine("GetNumberOfUsersOnline()");
             throw new NotSupportedException();
         }
 
@@ -220,6 +325,7 @@ namespace OdbcProvider
         public override bool ChangePassword(
           string username, string oldPassword, string newPassword)
         {
+            System.Diagnostics.Debug.WriteLine("ChangePassword()");
             throw new NotSupportedException();
         }
 
@@ -229,6 +335,7 @@ namespace OdbcProvider
           string username, string password,
           string newPasswordQuestion, string newPasswordAnswer)
         {
+            System.Diagnostics.Debug.WriteLine("ChangePasswordQuestionAndAnswer()");
             throw new NotSupportedException();
         }
 
@@ -306,6 +413,7 @@ namespace OdbcProvider
 
         public override bool DeleteUser(string username, bool deleteAllRelatedData)
         {
+            System.Diagnostics.Debug.WriteLine("DeleteUser()");
             throw new NotSupportedException();
         }
 
@@ -315,6 +423,7 @@ namespace OdbcProvider
           string emailToMatch, int pageIndex,
           int pageSize, out int totalRecords)
         {
+            System.Diagnostics.Debug.WriteLine("FindUsersByEmail()");
             throw new NotSupportedException();
         }
 
@@ -323,6 +432,7 @@ namespace OdbcProvider
           string usernameToMatch, int pageIndex,
           int pageSize, out int totalRecords)
         {
+            System.Diagnostics.Debug.WriteLine("FindUsersByName()");
             throw new NotSupportedException();
         }
 
@@ -331,6 +441,7 @@ namespace OdbcProvider
         public override string GetPassword(
           string username, string answer)
         {
+            System.Diagnostics.Debug.WriteLine("GetPassword()");
             throw new NotSupportedException();
         }
 
@@ -339,6 +450,7 @@ namespace OdbcProvider
         public override MembershipUser GetUser(
           object providerUserKey, bool userIsOnline)
         {
+            System.Diagnostics.Debug.WriteLine("GetUser()");
             throw new NotSupportedException();
         }
 
@@ -346,6 +458,7 @@ namespace OdbcProvider
 
         public override string GetUserNameByEmail(string email)
         {
+            System.Diagnostics.Debug.WriteLine("GetUserNameByEmail()");
             throw new NotSupportedException();
         }
 
@@ -354,6 +467,7 @@ namespace OdbcProvider
         public override string ResetPassword(
           string username, string answer)
         {
+            System.Diagnostics.Debug.WriteLine("ResetPassword()");
             throw new NotSupportedException();
         }
 
@@ -361,6 +475,7 @@ namespace OdbcProvider
 
         public override bool UnlockUser(string userName)
         {
+            System.Diagnostics.Debug.WriteLine("UnlockUser()");
             throw new NotSupportedException();
         }
 
@@ -368,77 +483,33 @@ namespace OdbcProvider
 
         public override void UpdateUser(MembershipUser user)
         {
-            throw new NotSupportedException();
-        }
+            if (user == null)
+                throw new ArgumentNullException(nameof(user));
 
-        /* ---------------------------------------- */
-        // MembershipProvider helper method
-        /* ---------------------------------------- */
-
-        public void ReadMembershipDataStore()
-        {
-            lock (this)
+            try
             {
-                if (_Users == null)
+                // Construct the SQL query to update the user information in the database
+                string updateUserQuery = "UPDATE users SET user_email = ?, user_active = ? WHERE username = ?";
+
+                using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
-                    try
+                    connection.Open();
+
+                    // Execute the update query
+                    using (OdbcCommand command = new OdbcCommand(updateUserQuery, connection))
                     {
-                        _Users = new Dictionary<string, MembershipUser>(16, StringComparer.InvariantCultureIgnoreCase);
-                        string queryString = "SELECT * FROM users WHERE user_id > 0";
-
-                        using (OdbcConnection connection = new OdbcConnection(_connectionString))
-                        {
-                            OdbcCommand command = new OdbcCommand(queryString, connection);
-                            connection.Open();
-
-                            OdbcDataReader reader = command.ExecuteReader();
-                            while (reader.Read())
-                            {
-                                string sUserName = reader["username"].ToString();
-                                string sEmail = reader["user_email"].ToString();
-                                string sPassword = reader["user_password"].ToString();
-                                DateTime dCreationDate =  _Utils.ConvertDate(reader["user_regdate"].ToString());
-                                DateTime dLastLoginDate = _Utils.ConvertDate(reader["user_session_time"].ToString());
-
-                                if (dLastLoginDate == new DateTime(1970, 1, 1))
-                                {
-                                    dLastLoginDate = dCreationDate;
-                                }
-
-                                DateTime dLastActivityDate = _Utils.ConvertDate(reader["user_session_time"].ToString());
-                                if (dLastActivityDate == new DateTime(1970, 1, 1))
-                                {
-                                    dLastActivityDate = dLastLoginDate;
-                                }
-
-                                Int32 status = Convert.ToInt32(reader["user_active"]?.ToString() ?? "0");
-                                bool approved = (status == 0) ? false : true;
-                                bool locked = (status == 0) ? true : false;
-                                MembershipUser user = new MembershipUser(
-                                    Name,              // Provider name
-                                    sUserName,         // UserName
-                                    null,              // ProviderUserKey
-                                    sEmail,            // Email
-                                    String.Empty,      // PasswordQuestion
-                                    sPassword,         // Comment
-                                    approved,          // IsApproved
-                                    locked,            // IsLockedOut
-                                    dCreationDate,     // CreationDate
-                                    dLastLoginDate,    // LastLoginDate
-                                    dLastActivityDate, // LastActivityDate
-                                    dCreationDate,     // LastPasswordChangedDate
-                                    dCreationDate      // LastLockoutDate
-                                    );
-                                _Users.Add(user.UserName, user);
-                            }
-                            reader.Close();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new ProviderException("Error: " + ex.Message);
+                        command.Parameters.AddWithValue("user_email", user.Email);
+                        command.Parameters.AddWithValue("user_active", user.IsApproved ? 1 : 0);
+                        command.Parameters.AddWithValue("username", user.UserName);
+                        command.ExecuteNonQuery();
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                // Log or handle the exception appropriately
+                Debug.WriteLine($"UpdateUser() Exception: {ex.Message}");
+                throw new ProviderException("An error occurred while updating the user.");
             }
         }
     }
