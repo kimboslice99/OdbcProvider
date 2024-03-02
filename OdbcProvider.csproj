@@ -71,11 +71,6 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsamd64_x86.bat" &gt; nul
-gacutil.exe /u OdbcProvider
-gacutil.exe /if "$(TargetPath)"
-copy /B /V /Y "$(TargetPath)" C:\windows\system32\inetsrv
-copy /B /V /Y "$(TargetPath)" C:\inetpub\test\bin
-iisreset</PostBuildEvent>
+    <PostBuildEvent></PostBuildEvent>
   </PropertyGroup>
 </Project>
