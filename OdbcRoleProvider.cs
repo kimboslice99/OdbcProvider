@@ -67,7 +67,7 @@ namespace OdbcProvider
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
-                    string query = "SELECT COUNT(*) FROM user_roles ug JOIN roles g ON ug.group_id = g.group_id JOIN users u ON ug.user_id = u.user_id WHERE u.user_name = ? AND g.role_name = ?";
+                    string query = "SELECT COUNT(*) FROM user_roles ug JOIN roles g ON ug.role_id = g.role_id JOIN users u ON ug.user_id = u.user_id WHERE u.user_name = ? AND g.role_name = ?";
                     using (OdbcCommand command = new OdbcCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("user_name", username);
