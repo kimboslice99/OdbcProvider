@@ -98,7 +98,7 @@ namespace OdbcProvider
 
         public override bool RequiresUniqueEmail
         {
-            get { throw new NotSupportedException(); }
+            get { return true; }
         }
 
         /* ---------------------------------------- */
@@ -134,12 +134,6 @@ namespace OdbcProvider
 
         public void ComInit(NameValueCollection config)
         {
-            if (string.IsNullOrEmpty(config["description"]))
-            {
-                config.Remove("description");
-                config.Add("description", "Odbc membership provider");
-            }
-
             _connectionString = config["connectionString"];
             if (String.IsNullOrEmpty(_connectionString))
             {
@@ -245,7 +239,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                _Utils.WriteDebug($"GetUser() Exception: {ex.Message}");
+                _Utils.WriteDebug($"GetUser() {ex.Message}");
                 throw new ProviderException("An error occurred while retrieving the user.");
             }
 

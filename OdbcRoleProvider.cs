@@ -46,9 +46,20 @@ namespace OdbcProvider
             {
                 throw new ProviderException("No connection string was specified.");
             }
-            _connectionString = ConfigurationManager.ConnectionStrings
-              [_connectionStringName].ConnectionString;
+            _connectionString = ConfigurationManager.ConnectionStrings[_connectionStringName].ConnectionString;
             _Utils = new Utils();
+        }
+
+        public void ComInit(NameValueCollection config)
+        {
+            _connectionString = config["connectionString"];
+            if (String.IsNullOrEmpty(_connectionString))
+            {
+                throw new ProviderException("No connection string was specified.");
+            }
+            _Utils = new Utils();
+            _Utils.DatabaseInit(_connectionString);
+            base.Initialize("OdbcMembershipProvider", config);
         }
 
         /* ---------------------------------------- */
@@ -216,6 +227,7 @@ namespace OdbcProvider
             catch (Exception ex)
             {
                 _Utils.WriteDebug($"RoleExists() {ex.Message}");
+                throw;
             }
             return false;
         }
@@ -347,7 +359,7 @@ namespace OdbcProvider
                     using (OdbcCommand command = new OdbcCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("role_name", roleName);
-                        command.Parameters.AddWithValue("usernameToMatch", $"%{usernameToMatch}%");
+                        command.Parameters.AddWithValue("user_name", $"%{usernameToMatch}%");
 
                         using (OdbcDataReader reader = command.ExecuteReader())
                         {

@@ -1,17 +1,14 @@
 ﻿/**
- * This is a wrapper for our membershipprovider to allow com access
- * Perhaps COM API should be restricted to an admin user somehow? TODO
- * 
- * Maybe expose some more useful methods?
- * 
- */
+* This is a wrapper for our membershipprovider to allow com access
+* Perhaps COM API should be restricted to an admin user somehow? TODO
+* 
+* Maybe expose some more useful methods?
+* 
+*/
 
-using OdbcProvider;
 using System;
 using System.Collections.Specialized;
 using System.Runtime.InteropServices;
-using System.Web.Security;
-
 
 namespace OdbcProvider
 {
@@ -20,126 +17,265 @@ namespace OdbcProvider
     public interface IOdbcMembershipProvider
     {
         void SetConnectionString(string connectionString);
+
         bool ValidateUser(string username, string password);
         bool ChangePassword(string username, string oldPassword, string newPassword);
         bool UnlockUser(string userName);
-        MembershipUser GetUser(string username, bool userIsOnline);
+        bool ChangePasswordQuestionAndAnswer(string username, string password, string newPasswordQuestion, string newPasswordAnswer);
+        bool DeleteUser(string username, bool deleteAllRelatedData);
+        string GetUserNameByEmail(string email);
+        string ResetPassword(string username, string answer);
+
+        bool IsUserInRole(string username, string roleName);
+        string[] GetRolesForUser(string username);
+        string[] GetUsersInRole(string roleName);
+        string[] GetAllRoles();
+        bool RoleExists(string roleName);
+        void CreateRole(string roleName);
+        bool DeleteRole(string roleName, bool throwOnPopulatedRole);
+        string[] FindUsersInRole(string roleName, string usernameToMatch);
+        void RemoveUsersFromRoles(string[] usernames, string[] roleNames);
     }
 
     [Guid("DCF9ECC2-CE4C-46CA-8E8D-06556DEC8969")]
     [ClassInterface(ClassInterfaceType.None)]
     [ComVisible(true)]
-    public class OdbcMembershipProviderWrapper : IOdbcMembershipProvider
+    public class OdbcProviderWrapper : IOdbcMembershipProvider
     {
-        string _connectionString;
+        private string _connectionString;
         private readonly OdbcMembershipProvider _provider;
-        Utils _Utils = new Utils();
+        private readonly OdbcRoleProvider _odbcRoleProvider;
+        private readonly Utils _Utils;
+        private readonly object _initLock = new object();
+        private bool _isProviderInitialized;
+        private bool _isRoleProviderInitialized;
 
-        public OdbcMembershipProviderWrapper()
+        public OdbcProviderWrapper()
         {
             _provider = new OdbcMembershipProvider();
+            _odbcRoleProvider = new OdbcRoleProvider();
+            _Utils = new Utils();
             _Utils.WriteDebug("OdbcMembershipProviderWrapper instance created.");
-        }
-
-        public void InitializeProvider()
-        {
-            try
-            {
-                var config = new NameValueCollection
-                {
-                    { "connectionString", _connectionString },
-                    // Add other necessary configurations
-                };
-
-                _provider.ComInit(config);
-                _Utils.WriteDebug("OdbcMembershipProvider initialized successfully.");
-            }
-            catch (Exception ex)
-            {
-                _Utils.WriteDebug($"Error initializing OdbcMembershipProvider: {ex.Message}");
-                throw; // Rethrow the exception to ensure the caller is aware of the failure
-            }
         }
 
         public void SetConnectionString(string connectionString)
         {
-            _connectionString = connectionString;
+            lock (_initLock)
+            {
+                _connectionString = connectionString;
+                _isProviderInitialized = false;
+                _isRoleProviderInitialized = false;
+            }
+        }
+
+        private void InitializeMembershipProvider()
+        {
+            if (_isProviderInitialized) return;
+
+            lock (_initLock)
+            {
+                if (_isProviderInitialized) return;
+
+                try
+                {
+                    var config = new NameValueCollection
+                    {
+                        { "connectionString", _connectionString },
+                        { "description", "Odbc membership provider" }
+                        // Add other necessary configurations
+                    };
+
+                    _provider.ComInit(config);
+                    _Utils.WriteDebug("OdbcMembershipProvider initialized successfully.");
+                    _isProviderInitialized = true;
+                }
+                catch (Exception ex)
+                {
+                    _Utils.WriteDebug($"Error initializing OdbcMembershipProvider: {ex.Message}");
+                    throw; // Rethrow the exception to ensure the caller is aware of the failure
+                }
+            }
+        }
+
+        private void InitializeRoleProvider()
+        {
+            if (_isRoleProviderInitialized) return;
+
+            lock (_initLock)
+            {
+                if (_isRoleProviderInitialized) return;
+
+                try
+                {
+                    var config = new NameValueCollection
+                    {
+                        { "connectionString", _connectionString },
+                        { "description", "Odbc membership provider" }
+                        // Add other necessary configurations
+                    };
+
+                    _odbcRoleProvider.ComInit(config);
+                    _Utils.WriteDebug("OdbcRoleProvider initialized successfully.");
+                    _isRoleProviderInitialized = true;
+                }
+                catch (Exception ex)
+                {
+                    _Utils.WriteDebug($"Error initializing OdbcRoleProvider: {ex.Message}");
+                    throw; // Rethrow the exception to ensure the caller is aware of the failure
+                }
+            }
         }
 
         public bool ValidateUser(string username, string password)
         {
-            InitializeProvider();
-            try
-            {
-                if (_provider == null)
-                {
-                    _Utils.WriteDebug("Provider instance is not initialized.");
-                    return false;
-                }
-                return _provider.ValidateUser(username, password);
-            }
-            catch (Exception ex)
-            {
-                _Utils.WriteDebug($"Error in ValidateUser: {ex.Message}");
-                return false;
-            }
+            InitializeMembershipProvider();
+            return ExecuteWithLogging(() => _provider.ValidateUser(username, password), nameof(ValidateUser));
         }
 
         public bool ChangePassword(string username, string oldPassword, string newPassword)
         {
-            InitializeProvider();
-            try
-            {
-                if (_provider == null)
-                {
-                    _Utils.WriteDebug("Provider instance is not initialized.");
-                    return false;
-                }
-                return _provider.ChangePassword(username, oldPassword, newPassword);
-            }
-            catch (Exception ex)
-            {
-                _Utils.WriteDebug($"Error in ChangePassword: {ex.Message}");
-                return false;
-            }
+            InitializeMembershipProvider();
+            return ExecuteWithLogging(() => _provider.ChangePassword(username, oldPassword, newPassword), nameof(ChangePassword));
         }
 
         public bool UnlockUser(string userName)
         {
-            InitializeProvider();
+            InitializeMembershipProvider();
+            return ExecuteWithLogging(() => _provider.UnlockUser(userName), nameof(UnlockUser));
+        }
+
+        public bool ChangePasswordQuestionAndAnswer(string username, string password, string newPasswordQuestion, string newPasswordAnswer)
+        {
+            InitializeMembershipProvider();
+            return ExecuteWithLogging(() => _provider.ChangePasswordQuestionAndAnswer(username, password, newPasswordQuestion, newPasswordAnswer), nameof(ChangePasswordQuestionAndAnswer));
+        }
+
+        public bool DeleteUser(string username, bool deleteAllRelatedData)
+        {
+            InitializeMembershipProvider();
+            return ExecuteWithLogging(() => _provider.DeleteUser(username, deleteAllRelatedData), nameof(DeleteUser));
+        }
+
+        public string GetUserNameByEmail(string email)
+        {
+            InitializeMembershipProvider();
+            return ExecuteWithLogging(() => _provider.GetUserNameByEmail(email), nameof(GetUserNameByEmail));
+        }
+
+        public string ResetPassword(string username, string answer)
+        {
+            InitializeMembershipProvider();
+            return ExecuteWithLogging(() => _provider.ResetPassword(username, answer), nameof(ResetPassword));
+        }
+
+        public bool IsUserInRole(string username, string roleName)
+        {
+            InitializeRoleProvider();
+            return ExecuteWithLogging(() => _odbcRoleProvider.IsUserInRole(username, roleName), nameof(IsUserInRole));
+        }
+
+        public string[] GetRolesForUser(string username)
+        {
+            InitializeRoleProvider();
+            return ExecuteWithLogging(() => _odbcRoleProvider.GetRolesForUser(username), nameof(GetRolesForUser));
+        }
+
+        public string[] GetUsersInRole(string roleName)
+        {
+            InitializeRoleProvider();
+            return ExecuteWithLogging(() => _odbcRoleProvider.GetUsersInRole(roleName), nameof(GetUsersInRole));
+        }
+
+        public string[] GetAllRoles()
+        {
+            InitializeRoleProvider();
+            return ExecuteWithLogging(() => _odbcRoleProvider.GetAllRoles(), nameof(GetAllRoles));
+        }
+
+        public bool RoleExists(string roleName)
+        {
+            InitializeRoleProvider();
+            return ExecuteWithLogging(() => _odbcRoleProvider.RoleExists(roleName), nameof(RoleExists));
+        }
+
+        public void CreateRole(string roleName)
+        {
+            InitializeRoleProvider();
+            ExecuteWithLogging(() => { _odbcRoleProvider.CreateRole(roleName); return true; }, nameof(CreateRole));
+        }
+
+        public bool DeleteRole(string roleName, bool throwOnPopulatedRole)
+        {
+            InitializeRoleProvider();
+            return ExecuteWithLogging(() =>
+            {
+                _odbcRoleProvider.DeleteRole(roleName, throwOnPopulatedRole);
+                return true;
+            }, nameof(DeleteRole));
+        }
+
+        public void AddUsersToRoles(string[] usernames, string[] roleNames)
+        {
+            InitializeRoleProvider();
+            ExecuteWithLogging(() =>
+            {
+                _odbcRoleProvider.AddUsersToRoles(usernames, roleNames);
+            }, nameof(AddUsersToRoles));
+        }
+
+        public string[] FindUsersInRole(string roleName, string usernameToMatch)
+        {
+            InitializeRoleProvider();
+            return ExecuteWithLogging(() =>
+            {
+                return _odbcRoleProvider.FindUsersInRole(roleName, usernameToMatch);
+            }, nameof(FindUsersInRole));
+        }
+
+        public void RemoveUsersFromRoles(string[] usernames, string[] roleNames)
+        {
+            InitializeRoleProvider();
+            ExecuteWithLogging(() =>
+            {
+               _odbcRoleProvider.RemoveUsersFromRoles(usernames, roleNames);
+            }, nameof(FindUsersInRole));
+        }
+
+        /// <summary>
+        /// A helper function to reduce code duplication
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="func"></param>
+        /// <param name="methodName"></param>
+        /// <returns></returns>
+        private T ExecuteWithLogging<T>(Func<T> func, string methodName)
+        {
             try
             {
-                if (_provider == null)
-                {
-                    _Utils.WriteDebug("Provider instance is not initialized.");
-                    return false;
-                }
-                return _provider.UnlockUser(userName);
+                return func();
             }
             catch (Exception ex)
             {
-                _Utils.WriteDebug($"Error in UnlockUser: {ex.Message}");
-                _Utils.WriteDebug(userName);
-                return false;
+                _Utils.WriteDebug($"Error in {methodName}: {ex.Message}");
+                return default(T);
             }
         }
 
-        public MembershipUser GetUser(string username, bool userIsOnline)
+        /// <summary>
+        /// void helper
+        /// </summary>
+        /// <param name="action"></param>
+        /// <param name="methodName"></param>
+        private void ExecuteWithLogging(Action action, string methodName)
         {
-            InitializeProvider();
             try
             {
-                if (_provider == null)
-                {
-                    _Utils.WriteDebug("Provider instance is not initialized.");
-                    return null;
-                }
-                return _provider.GetUser(username, userIsOnline);
+                action();
             }
             catch (Exception ex)
             {
-                _Utils.WriteDebug($"Error in GetUser: {ex.Message}");
-                return null;
+                _Utils.WriteDebug($"Error in {methodName}: {ex.Message}");
+                throw; // Rethrow the exception to ensure the caller is aware of the failure
             }
         }
     }
