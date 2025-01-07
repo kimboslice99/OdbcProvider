@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Configuration.Provider;
 using System.Configuration;
 using System.Data.Odbc;
 using System.Web.Security;
-using System.Diagnostics;
 
 namespace OdbcProvider
 {
@@ -46,8 +44,7 @@ namespace OdbcProvider
             _connectionStringName = config["connectionStringName"];
             if (String.IsNullOrEmpty(_connectionStringName))
             {
-                throw new ProviderException(
-                  "No connection string was specified.\n");
+                throw new ProviderException("No connection string was specified.");
             }
             _connectionString = ConfigurationManager.ConnectionStrings
               [_connectionStringName].ConnectionString;
@@ -79,7 +76,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"IsUserInRole() Exception: {ex.Message}");
+                _Utils.WriteDebug($"IsUserInRole(): {ex.Message}");
             }
 
             return userInRole;
@@ -116,7 +113,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"GetRolesForUser() Exception: {ex.Message}");
+                _Utils.WriteDebug($"GetRolesForUser() {ex.Message}");
             }
 
             return roles;
@@ -152,13 +149,12 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"GetUsersInRole() Exception: {ex.Message}");
+                _Utils.WriteDebug($"GetUsersInRole() {ex.Message}");
                 throw new ProviderException("An error occurred while retrieving users in role.");
             }
 
             return usersInRole.ToArray();
         }
-
 
         /* ---------------------------------------- */
 
@@ -177,7 +173,7 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string roleName = reader["role_name"].ToString();
+                                string roleName = Convert.ToString(reader["role_name"]);
                                 allRoles.Add(roleName);
                             }
                         }
@@ -186,29 +182,30 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"GetAllRoles() Exception: {ex.Message}");
+                _Utils.WriteDebug($"GetAllRoles() {ex.Message}");
                 throw new ProviderException("An error occurred while retrieving all roles.");
             }
 
             return allRoles.ToArray();
         }
 
-
         /* ---------------------------------------- */
 
         public override bool RoleExists(string roleName)
         {
-            if (roleName == null)
-                throw new ArgumentNullException();
-            if (roleName == String.Empty)
-                throw new ArgumentException();
             try
             {
-                string userQueryString = $"SELECT * FROM roles WHERE role_name={roleName}";
+                if (roleName == null)
+                    throw new ArgumentNullException();
+                if (roleName == String.Empty)
+                    throw new ArgumentException();
+
                 using (OdbcConnection connection = new OdbcConnection(_connectionString))
                 {
                     connection.Open();
-                    OdbcCommand cmd = new OdbcCommand(userQueryString, connection);
+                    string query = $"SELECT * FROM roles WHERE role_name = ?";
+                    OdbcCommand cmd = new OdbcCommand(query, connection);
+                    cmd.Parameters.AddWithValue("role_name", roleName);
                     OdbcDataReader reader = cmd.ExecuteReader();
                     if(reader.Read())
                     {
@@ -218,7 +215,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"DeleteRole() Exception: {ex.Message}");
+                _Utils.WriteDebug($"RoleExists() {ex.Message}");
             }
             return false;
         }
@@ -229,19 +226,23 @@ namespace OdbcProvider
         {
             try
             {
-                string userQueryString = $"INSERT INTO roles (role_name) VALUES ('{roleName}')";
-                using (OdbcConnection connection = new OdbcConnection(_connectionString))
+                string query = $"INSERT INTO roles (role_name) VALUES (?)";
+                Dictionary<string, object> parameters = new Dictionary<string, object>
                 {
-                    connection.Open();
-                    OdbcCommand cmd = new OdbcCommand(userQueryString, connection);
-                    cmd.ExecuteNonQuery();
+                    { "role_name", roleName }
+                };
+                int result = _Utils.ExecutePreparedNonQuery(query, _connectionString, parameters);
+                if(result == 0)
+                {
+                    throw new ProviderException($"Failed to create {roleName} role");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CreateRole() Exception: {ex.Message}");
+                _Utils.WriteDebug($"CreateRole() {ex.Message}");
             }
         }
+
         /* ---------------------------------------- */
 
         public override bool DeleteRole(
@@ -249,20 +250,24 @@ namespace OdbcProvider
         {
             try
             {
-                string userQueryString = $"DELETE FROM roles WHERE role_name={roleName}";
-                using (OdbcConnection connection = new OdbcConnection(_connectionString))
+                string query = $"DELETE FROM roles WHERE role_name = ?";
+                Dictionary<string, object> parameters = new Dictionary<string, object>
                 {
-                    connection.Open();
-                    OdbcCommand cmd = new OdbcCommand(userQueryString, connection);
-                    if(cmd.ExecuteNonQuery() > 0)
-                    {
-                        return true;
-                    }
+                    { "role_name", roleName }
+                };
+                int result = _Utils.ExecutePreparedNonQuery(query, _connectionString, parameters);
+                if(result == 0)
+                {
+                    throw new ProviderException($"Failed to delete {roleName} role");
+                }
+                else
+                {
+                    return true;
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"DeleteRole() Exception: {ex.Message}");
+                _Utils.WriteDebug($"DeleteRole() {ex.Message}");
             }
             return false;
         }
@@ -317,7 +322,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"AddUsersToRoles() Exception: {ex.Message}");
+                _Utils.WriteDebug($"AddUsersToRoles() {ex.Message}");
                 throw new ProviderException("An error occurred while adding users to roles.");
             }
         }
@@ -357,7 +362,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"FindUsersInRole() Exception: {ex.Message}");
+                _Utils.WriteDebug($"FindUsersInRole() {ex.Message}");
                 throw new ProviderException("An error occurred while finding users in role.");
             }
 
@@ -415,7 +420,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"RemoveUsersFromRoles() Exception: {ex.Message}");
+                _Utils.WriteDebug($"RemoveUsersFromRoles() {ex.Message}");
                 throw new ProviderException("An error occurred while removing users from roles.");
             }
         }

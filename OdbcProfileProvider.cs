@@ -2,7 +2,6 @@
 using System.Configuration;
 using System.Configuration.Provider;
 using System.Data.Odbc;
-using System.Diagnostics;
 using System.Web.Profile;
 
 namespace OdbcProvider
@@ -11,6 +10,7 @@ namespace OdbcProvider
     {
         private string _connectionStringName;
         private string _connectionString;
+        private Utils _Utils;
 
         public override string ApplicationName { get; set; }
 
@@ -33,11 +33,12 @@ namespace OdbcProvider
             _connectionStringName = config["connectionStringName"];
             if (String.IsNullOrEmpty(_connectionStringName))
             {
-                throw new ProviderException(
-                  "No connection string was specified.\n");
+                throw new ProviderException("No connection string was specified.");
             }
             _connectionString = ConfigurationManager.ConnectionStrings
               [_connectionStringName].ConnectionString;
+
+            _Utils = new Utils();
         }
 
         public override SettingsPropertyValueCollection GetPropertyValues(SettingsContext context, SettingsPropertyCollection collection)
@@ -78,7 +79,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"GetPropertyValues() Exception: {ex.Message}");
+                _Utils.WriteDebug($"GetPropertyValues() {ex.Message}");
                 throw new ProviderException("An error occurred while retrieving property values.");
             }
 
@@ -114,7 +115,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"SetPropertyValues() Exception: {ex.Message}");
+                _Utils.WriteDebug($"SetPropertyValues() {ex.Message}");
                 throw new ProviderException("An error occurred while setting property values.");
             }
         }
@@ -150,8 +151,8 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string username = reader["user_name"].ToString();
-                                DateTime lastActivityDate = DateTime.Parse(reader["lastactivitydate"].ToString());
+                                string username = Convert.ToString(reader["user_name"]);
+                                DateTime lastActivityDate = Convert.ToDateTime(reader["lastactivitydate"]);
 
                                 ProfileInfo profile = new ProfileInfo(username, false, lastActivityDate, lastActivityDate, 0);
                                 profiles.Add(profile);
@@ -162,7 +163,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"GetAllProfiles() Exception: {ex.Message}");
+                _Utils.WriteDebug($"GetAllProfiles() {ex.Message}");
                 throw new ProviderException("An error occurred while retrieving all profiles.");
             }
 
@@ -202,8 +203,8 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string username = reader["user_name"].ToString();
-                                DateTime lastActivityDate = DateTime.Parse(reader["lastactivitydate"].ToString());
+                                string username = Convert.ToString(reader["user_name"]);
+                                DateTime lastActivityDate = Convert.ToDateTime(reader["lastactivitydate"]);
 
                                 ProfileInfo profile = new ProfileInfo(username, false, lastActivityDate, lastActivityDate, 0);
                                 inactiveProfiles.Add(profile);
@@ -214,7 +215,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"GetAllInactiveProfiles() Exception: {ex.Message}");
+                _Utils.WriteDebug($"GetAllInactiveProfiles() {ex.Message}");
                 throw new ProviderException("An error occurred while retrieving all inactive profiles.");
             }
 
@@ -243,7 +244,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"GetNumberOfInactiveProfiles() Exception: {ex.Message}");
+                _Utils.WriteDebug($"GetNumberOfInactiveProfiles() {ex.Message}");
                 throw new ProviderException("An error occurred while retrieving the number of inactive profiles.");
             }
 
@@ -284,8 +285,8 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string username = reader["user_name"].ToString();
-                                DateTime lastActivityDate = DateTime.Parse(reader["lastactivitydate"].ToString());
+                                string username = Convert.ToString(reader["user_name"]);
+                                DateTime lastActivityDate = Convert.ToDateTime(reader["lastactivitydate"]);
 
                                 ProfileInfo profile = new ProfileInfo(username, false, lastActivityDate, lastActivityDate, 0);
                                 inactiveProfiles.Add(profile);
@@ -296,7 +297,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"FindInactiveProfilesByUserName() Exception: {ex.Message}");
+                _Utils.WriteDebug($"FindInactiveProfilesByUserName() {ex.Message}");
                 throw new ProviderException("An error occurred while finding inactive profiles by username.");
             }
 
@@ -335,8 +336,8 @@ namespace OdbcProvider
                         {
                             while (reader.Read())
                             {
-                                string username = reader["user_name"].ToString();
-                                DateTime lastActivityDate = DateTime.Parse(reader["lastactivitydate"].ToString());
+                                string username = Convert.ToString(reader["user_name"]);
+                                DateTime lastActivityDate = Convert.ToDateTime(reader["lastactivitydate"]);
 
                                 ProfileInfo profile = new ProfileInfo(username, false, lastActivityDate, lastActivityDate, 0);
                                 profiles.Add(profile);
@@ -347,7 +348,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"FindProfilesByUserName() Exception: {ex.Message}");
+                _Utils.WriteDebug($"FindProfilesByUserName() {ex.Message}");
                 throw new ProviderException("An error occurred while finding profiles by username.");
             }
 
@@ -378,7 +379,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"DeleteProfiles() Exception: {ex.Message}");
+                _Utils.WriteDebug($"DeleteProfiles() {ex.Message}");
                 throw new ProviderException("An error occurred while deleting profiles.");
             }
 
@@ -410,7 +411,7 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"DeleteProfiles(string[]) Exception: {ex.Message}");
+                _Utils.WriteDebug($"DeleteProfiles(string[]) {ex.Message}");
                 throw new ProviderException("An error occurred while deleting profiles.");
             }
 
@@ -439,13 +440,12 @@ namespace OdbcProvider
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"DeleteInactiveProfiles() Exception: {ex.Message}");
+                _Utils.WriteDebug($"DeleteInactiveProfiles() {ex.Message}");
                 throw new ProviderException("An error occurred while deleting inactive profiles.");
             }
 
             return deletedCount;
         }
-
     }
 }
 
