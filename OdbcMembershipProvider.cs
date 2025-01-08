@@ -161,10 +161,12 @@ namespace OdbcProvider
                     connection.Open();
                     command.Parameters.AddWithValue("user_name", username);
                     object result = command.ExecuteScalar();
-                    if (result != null)
+                    if (result != null && result is byte[] passwordHashBytes)
                     {
-                        string hashedPassword = result.ToString();
-                        return _Utils.PasswordVerify(password, hashedPassword);
+                        string passwordHash = System.Text.Encoding.UTF8.GetString(passwordHashBytes);
+                        bool verify = _Utils.PasswordVerify(password, passwordHash);
+                        _Utils.WriteDebug(verify.ToString());
+                        return verify;
                     }
                     return false;
                 }
@@ -403,19 +405,21 @@ namespace OdbcProvider
                     DateTime registrationDate = DateTime.UtcNow;
                     DateTime minValue = DateTime.MinValue;
                     string hashedPassword = _Utils.PasswordHash(password);
+                    passwordQuestion = passwordQuestion ?? String.Empty;
+                    passwordAnswer = passwordAnswer ?? String.Empty;
 
                     string insertUserQuery = "INSERT INTO users (" +
-                        "user_name," +
-                        "user_password," +
-                        "user_email," +
-                        "user_regdate," +
-                        "user_last_login," +
-                        "user_last_activity," +
-                        "user_last_password_changed," +
-                        "user_last_lockout," +
-                        "user_password_question," +
-                        "user_password_answer," +
-                        "user_approved," +
+                        "user_name, " +
+                        "user_password, " +
+                        "user_email, " +
+                        "user_regdate, " +
+                        "user_last_login, " +
+                        "user_last_activity, " +
+                        "user_last_password_changed, " +
+                        "user_last_lockout, " +
+                        "user_password_question, " +
+                        "user_password_answer, " +
+                        "user_approved, " +
                         "user_locked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
                     Dictionary<string, object> values = new Dictionary<string, object>

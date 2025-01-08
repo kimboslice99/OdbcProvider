@@ -76,7 +76,7 @@ namespace OdbcProvider
                     connection.Open();
                     foreach (var item in parameters)
                     {
-                        if(null != item.Key && null != item.Value)
+                        if(null != item.Key)
                         {
                             command.Parameters.AddWithValue(item.Key, item.Value);
                         }
