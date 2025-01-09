@@ -10,3 +10,12 @@
 - run `AddToTrustedProviders.ps1`
 - copy to bin folder of site
 - now you can add the Role and Membership providers, after this point you should be able to create users under the .Net Users page in IIS
+
+- if registering COM, here is an example of usage. currently not much is passed through the wrapper. more to come.
+```php
+$membershipCom = new COM('OdbcProvider.OdbcProviderWrapper');
+$membershipCom->SetConnectionString("DSN=YOUR_DSN");
+$membershipCom->IsUserInRole($_SERVER['REMOTE_USER'], "RoleName"); // bool
+$membershipCom->ValidateUser("username", "password")
+$membershipCom->UnlockUser("username")
+```
