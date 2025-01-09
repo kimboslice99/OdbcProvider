@@ -18,6 +18,6 @@ if registering COM, here is an example of usage. currently not much is passed th
 $membershipCom = new COM('OdbcProvider.OdbcProviderWrapper');
 $membershipCom->SetConnectionString("DSN=YOUR_DSN");
 $membershipCom->IsUserInRole($_SERVER['REMOTE_USER'], "RoleName"); // bool
-$membershipCom->ValidateUser("username", "password")
-$membershipCom->UnlockUser("username")
+$membershipCom->ValidateUser("username", "password");
+$membershipCom->UnlockUser("username");
 ```
