@@ -153,6 +153,26 @@ namespace OdbcProvider
             }
         }
 
+        internal bool ValidateUser(string username, string password, string connectionString)
+        {
+            // Query the database to validate user credentials
+            string query = "SELECT user_password FROM users WHERE user_name = ?";
+            using (OdbcConnection connection = new OdbcConnection(connectionString))
+            using (OdbcCommand command = new OdbcCommand(query, connection))
+            {
+                connection.Open();
+                command.Parameters.AddWithValue("user_name", username);
+                object result = command.ExecuteScalar();
+                if (result != null && result is byte[] passwordHashBytes)
+                {
+                    string passwordHash = System.Text.Encoding.UTF8.GetString(passwordHashBytes);
+                    bool verify = PasswordVerify(password, passwordHash);
+                    return verify;
+                }
+                return false;
+            }
+        }
+
         /* ---------------------------------------- */
 
         internal DateTime ConvertDate(string offset)

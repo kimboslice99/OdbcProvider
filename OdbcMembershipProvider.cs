@@ -153,23 +153,9 @@ namespace OdbcProvider
 
             try
             {
-                // Query the database to validate user credentials
-                string query = "SELECT user_password FROM users WHERE user_name = ?";
-                using (OdbcConnection connection = new OdbcConnection(_connectionString))
-                using (OdbcCommand command = new OdbcCommand(query, connection))
-                {
-                    connection.Open();
-                    command.Parameters.AddWithValue("user_name", username);
-                    object result = command.ExecuteScalar();
-                    if (result != null && result is byte[] passwordHashBytes)
-                    {
-                        string passwordHash = System.Text.Encoding.UTF8.GetString(passwordHashBytes);
-                        bool verify = _Utils.PasswordVerify(password, passwordHash);
-                        _Utils.WriteDebug(verify.ToString());
-                        return verify;
-                    }
-                    return false;
-                }
+                string query = "UPDATE users SET user_last_login = NOW()";
+                _Utils.ExecuteNonQuery(query, _connectionString);
+                return _Utils.ValidateUser(username, password, _connectionString);
             }
             catch (Exception ex)
             {
@@ -342,7 +328,7 @@ namespace OdbcProvider
             _Utils.WriteDebug("ChangePassword()");
             if (_Utils.IsExistingUsername(username, _connectionString))
             {
-                if(ValidateUser(username, oldPassword))
+                if(_Utils.ValidateUser(username, oldPassword, _connectionString))
                 {
                     string hash = _Utils.PasswordHash(newPassword);
                     Dictionary<string, object> values = new Dictionary<string, object>
@@ -365,7 +351,7 @@ namespace OdbcProvider
           string newPasswordQuestion, string newPasswordAnswer)
         {
             _Utils.WriteDebug("ChangePasswordQuestionAndAnswer()");
-            if(!ValidateUser(username, password))
+            if(!_Utils.ValidateUser(username, password, _connectionString))
             {
                 return false;
             }

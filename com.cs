@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Specialized;
 using System.Runtime.InteropServices;
+using System.Web.Security;
 
 namespace OdbcProvider
 {
@@ -129,7 +130,7 @@ namespace OdbcProvider
         public bool ValidateUser(string username, string password)
         {
             InitializeMembershipProvider();
-            return ExecuteWithLogging(() => _provider.ValidateUser(username, password), nameof(ValidateUser));
+            return ExecuteWithLogging(() => _Utils.ValidateUser(username, password, _connectionString), nameof(ValidateUser));
         }
 
         public bool ChangePassword(string username, string oldPassword, string newPassword)
